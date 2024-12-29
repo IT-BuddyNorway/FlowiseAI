@@ -1,7 +1,12 @@
-import { AzureOpenAIInput } from 'langchain/chat_models/openai'
+import { AzureOpenAIInput, OpenAIEmbeddings, OpenAIEmbeddingsParams } from '@langchain/openai'
 import { ICommonObject, INode, INodeData, INodeParams } from '../../../src/Interface'
 import { getBaseClasses, getCredentialData, getCredentialParam } from '../../../src/utils'
-import { OpenAIEmbeddings, OpenAIEmbeddingsParams } from 'langchain/embeddings/openai'
+
+const serverCredentialsExists =
+    !!process.env.AZURE_OPENAI_API_KEY &&
+    !!process.env.AZURE_OPENAI_API_INSTANCE_NAME &&
+    (!!process.env.AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME || !!process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME) &&
+    !!process.env.AZURE_OPENAI_API_VERSION
 
 class AzureOpenAIEmbedding_Embeddings implements INode {
     label: string
@@ -28,14 +33,15 @@ class AzureOpenAIEmbedding_Embeddings implements INode {
             label: 'Connect Credential',
             name: 'credential',
             type: 'credential',
-            credentialNames: ['azureOpenAIApi']
+            credentialNames: ['azureOpenAIApi'],
+            optional: serverCredentialsExists
         }
         this.inputs = [
             {
                 label: 'Batch Size',
                 name: 'batchSize',
                 type: 'number',
-                default: '1',
+                default: '100',
                 optional: true,
                 additionalParams: true
             },
@@ -45,6 +51,13 @@ class AzureOpenAIEmbedding_Embeddings implements INode {
                 type: 'number',
                 optional: true,
                 additionalParams: true
+            },
+            {
+                label: 'BasePath',
+                name: 'basepath',
+                type: 'string',
+                optional: true,
+                additionalParams: true
             }
         ]
     }
@@ -52,6 +65,7 @@ class AzureOpenAIEmbedding_Embeddings implements INode {
     async init(nodeData: INodeData, _: string, options: ICommonObject): Promise<any> {
         const batchSize = nodeData.inputs?.batchSize as string
         const timeout = nodeData.inputs?.timeout as string
+        const basePath = nodeData.inputs?.basepath as string
 
         const credentialData = await getCredentialData(nodeData.credential ?? '', options)
         const azureOpenAIApiKey = getCredentialParam('azureOpenAIApiKey', credentialData, nodeData)
@@ -63,7 +77,8 @@ class AzureOpenAIEmbedding_Embeddings implements INode {
             azureOpenAIApiKey,
             azureOpenAIApiInstanceName,
             azureOpenAIApiDeploymentName,
-            azureOpenAIApiVersion
+            azureOpenAIApiVersion,
+            azureOpenAIBasePath: basePath || undefined
         }
 
         if (batchSize) obj.batchSize = parseInt(batchSize, 10)
